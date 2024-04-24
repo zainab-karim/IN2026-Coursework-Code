@@ -20,17 +20,17 @@ class Spaceship;
 class GUILabel;
 
 // Define the HighScore struct here
-struct HighScore {
+struct HighScoreEntry {
 	std::string playerName;
 	int score;
 
-	// Default constructor
-	HighScore() : playerName(""), score(0) {}
-	std::chrono::time_point<std::chrono::system_clock> timestamp;
-	// Parameterized constructor
-	HighScore(const std::string& name, int scr) : playerName(name), score(scr) {}
-};
+	HighScoreEntry(std::string n, int s) : playerName(n), score(s) {}
 
+	// To sort in descending order
+	bool operator < (const HighScoreEntry& hse) const {
+		return score > hse.score;
+	}
+};
 struct Button {
 	float x, y, width, height;
 	std::string text;
@@ -73,7 +73,6 @@ public:
 
 	void OnScoreChanged(int score);
 
-	void DisplayHighScores();
 
 	// Declaration of the IPlayerLister interface //////////////////////////////
 
@@ -97,10 +96,11 @@ private:
 
 	int playerScore;
 
-	std::vector<HighScore> highScores;     
-	const std::string highScoresFileName = "./high_scores.txt"; // Relative path from the executable
-	// File to save/load high scores
 	std::vector<shared_ptr<GUILabel>> mHighScoreEntries;
+
+	std::string mPlayerName;
+	std::string mScoreFile = "highscores.txt";
+	std::vector<HighScoreEntry> scores;
 
 	shared_ptr<Spaceship> mSpaceship;
 	shared_ptr<GUILabel> mScoreLabel;
@@ -122,8 +122,7 @@ private:
 	shared_ptr<GameObject> CreateSpaceship();
 	void CreateGUI();
 	void CreateAsteroids(const uint num_asteroids);
-	void SaveHighScoresToFile();
-	void LoadHighScoresFromFile();
+	void SaveScoresToFile(const std::string& playerName, int score);
 	shared_ptr<GameObject> CreateExplosion();
 	void InitialiseDemoMode();
 	void DemoMode();

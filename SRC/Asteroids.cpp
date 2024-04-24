@@ -35,7 +35,6 @@ void Asteroids::Update(int t) {
 			DemoMode();
 		}
 		else {
-			OnKeyPressed(' ', 0, 0); // Simulate shooting bullets
 		}
 		// Normal game update logic
 		break;
@@ -173,7 +172,12 @@ void Asteroids::OnKeyPressed(uchar key, int x, int y)
 		//mScoreKeeper.ResetScore();
 		//mPlayer.ResetLives();
 
+		OnKeyPressed(' ', 0, 0); // Simulate pressing the spacebar
+		OnSpecialKeyPressed(GLUT_KEY_UP, 0, 0); // Simulate pressing the up arrow key
+		OnSpecialKeyPressed(GLUT_KEY_LEFT, 0, 0); // Simulate pressing the left arrow key
+		OnSpecialKeyPressed(GLUT_KEY_RIGHT, 0, 0); // Simulate pressing the right arrow key
 	}
+
 	
 	void Asteroids::DrawStartScreen()
 	{
@@ -224,6 +228,11 @@ void Asteroids::OnKeyPressed(uchar key, int x, int y)
 		// Possibly reset score and lives
 		//mScoreKeeper.ResetScore();
 		//mPlayer.ResetLives();
+
+		OnKeyPressed(' ', 0, 0); // Simulate pressing the spacebar
+		OnSpecialKeyPressed(GLUT_KEY_UP, 0, 0); // Simulate pressing the up arrow key
+		OnSpecialKeyPressed(GLUT_KEY_LEFT, 0, 0); // Simulate pressing the left arrow key
+		OnSpecialKeyPressed(GLUT_KEY_RIGHT, 0, 0); // Simulate pressing the right arrow key
 	}
 
 
@@ -248,49 +257,6 @@ void Asteroids::DemoMode() {
 
 void Asteroids::DrawGameOverScreen()
 {
-	// Check if the player already exists in the high score table
-	bool playerExists = false;
-	int existingPlayerIndex = -1; // Track the index of the existing player if found
-	for (size_t i = 0; i < highScores.size(); ++i) {
-		if (highScores[i].playerName == playerName) {
-			playerExists = true;
-			existingPlayerIndex = i;
-			break;
-		}
-	}
-
-	if (playerExists) {
-		// If the player exists, compare scores
-		if (playerScore > highScores[existingPlayerIndex].score) {
-			// If the current score is higher, update the existing score
-			highScores[existingPlayerIndex].score = playerScore;
-			// You may also update the timestamp here if needed
-		}
-	}
-	else {
-		// If the player does not already exist, add them to the high score table
-		HighScore newScore{ playerName, playerScore };
-		highScores.push_back(newScore);
-	}
-
-	// Sort high scores by score and timestamp
-	std::sort(highScores.begin(), highScores.end(), [](const HighScore& a, const HighScore& b) {
-		if (a.score == b.score) {
-			// If scores are equal, sort by timestamp in descending order (latest first)
-			return a.timestamp > b.timestamp;
-		}
-		else {
-			// Otherwise, sort by score in descending order
-			return a.score > b.score;
-		}
-		});
-
-	// Keep only the top 5 scores
-	if (highScores.size() > 5) {
-		highScores.resize(5);
-	}
-
-
 	// Clear the screen with black background
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -327,29 +293,53 @@ void Asteroids::DrawGameOverScreen()
 	}
 }
 
+void Asteroids::SaveScoresToFile(const std::string& playerName, int playerScore) {
+	std::ofstream fileout(mScoreFile, std::ios::app);
+	if (fileout) {
+		fileout << playerName << "," << playerScore << std::endl;  // Use playerScore instead of score
+	}
+	else {
+		std::cerr << "Error opening score file for writing." << std::endl;
+	}
+	fileout.close();
+}
+
 
 	void Asteroids::DrawHighScoresScreen()
 	{
+		// Method to display high scores, called when needed
+		std::ifstream filein(mScoreFile);
+		std::string line;
+		std::vector<std::pair<std::string, int>> scores;
 
-    LoadHighScoresFromFile();
+		while (std::getline(filein, line)) {
+			std::istringstream ss(line);
+			std::string playerName;
+			int score;
+			if (std::getline(ss, playerName, ',') && (ss >> score)) {
+				scores.emplace_back(playerName, score);
+			}
+		}
+		filein.close();
 
-    HighScore newScore{ playerName, playerScore };
-    highScores.push_back(newScore);
-    // Sort high scores by score and timestamp
-    std::sort(highScores.begin(), highScores.end(), [](const HighScore& a, const HighScore& b) {
-        if (a.score == b.score) {
-            // If scores are equal, sort by timestamp in descending order (latest first)
-            return a.timestamp > b.timestamp;
-        }
-        else {
-            // Otherwise, sort by score in descending order
-            return a.score > b.score;
-        }
-    });
+		// Sort scores in descending order based on score value
+		std::sort(scores.begin(), scores.end(), [](const auto& a, const auto& b) {
+			return a.second > b.second;
+			});
 
-    if (highScores.size() > 5) {
-        highScores.resize(5);
-    }
+		// Update and display top 5 scores
+		int max_display = std::min(5, static_cast<int>(scores.size()));
+		for (int i = 0; i < max_display; ++i) {
+			std::string scoreText = std::to_string(i + 1) + ". " + scores[i].first + " - " + std::to_string(scores[i].second);
+			mHighScoreEntries[i]->SetText(scoreText);
+			mHighScoreEntries[i]->SetVisible(true);
+		}
+
+		// Set other scores invisible if there are less than 5 scores
+		for (int i = max_display; i < 5; ++i) {
+			mHighScoreEntries[i]->SetVisible(false);
+		}
+
 
 		// Clear the screen with black background
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -369,9 +359,6 @@ void Asteroids::DrawGameOverScreen()
 		// Set text color to white
 		glColor3f(1.0f, 1.0f, 1.0f);
 
-		// Render the high scores
-		DisplayHighScores();
-
 		// Restore the previous projection matrix
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
@@ -379,70 +366,6 @@ void Asteroids::DrawGameOverScreen()
 
 		// Re-enable lighting if it was enabled before
 		glEnable(GL_LIGHTING);
-	}
-	
-	void Asteroids::DisplayHighScores()
-	{
-		LoadHighScoresFromFile();  // Ensure the high scores are loaded
-		mHighScoresLabel->SetText("High Scores:");  // Set the main high scores label
-
-		int i = 0;
-		for (auto& score : highScores) {
-			if (i < mHighScoreEntries.size()) {
-				std::ostringstream ss;
-				ss << (i + 1) << ". " << score.playerName << " - " << score.score;
-				mHighScoreEntries[i]->SetText(ss.str());
-				mHighScoreEntries[i]->SetVisible(true);
-			}
-			else {
-				break;
-			}
-			++i;
-		}
-
-		// Hide any unused score labels
-		for (; i < mHighScoreEntries.size(); ++i) {
-			mHighScoreEntries[i]->SetVisible(false);
-		}
-	}
-	
-	void Asteroids::LoadHighScoresFromFile() {
-		std::ifstream file(highScoresFileName);
-		std::string line;
-
-		// Clear existing high scores
-		highScores.clear();
-
-		// Load scores from file
-		while (getline(file, line)) {
-			std::istringstream iss(line);
-			std::string name;
-			int score;
-			if (iss >> name >> score) {
-				HighScore hs{ name, score };
-				highScores.push_back(hs);
-			}
-		}
-		file.close();
-
-		// Sort high scores by score in descending order
-		std::sort(highScores.begin(), highScores.end(), [](const HighScore& a, const HighScore& b) {
-			return a.score > b.score;
-			});
-	}
-
-
-
-	void Asteroids::SaveHighScoresToFile() {
-		std::ofstream file(highScoresFileName, std::ios_base::app); // Open file in append mode
-		if (file.is_open()) {
-			std::cout << "Writing to file: " << playerName << " " << playerScore << std::endl;  // Debugging output
-			file << playerName << " " << playerScore << "\n";  // Make sure to write a newline character
-			file.close(); // Close the file after writing
-		}
-		else {
-			std::cerr << "Unable to open file " << highScoresFileName << " for writing." << std::endl;  // Error message if file cannot be opened
-		}
 	}
 
 
@@ -651,21 +574,23 @@ void Asteroids::DrawGameOverScreen()
 		shared_ptr<GUIComponent> demo_mode_component = static_pointer_cast<GUIComponent>(mDemoModeLabel);
 		mGameDisplay->GetContainer()->AddComponent(demo_mode_component, GLVector2f(0.5f, 0.9f));
 
+		// High Scores Title Label
 		mHighScoresLabel = make_shared<GUILabel>("High Scores:");
 		mHighScoresLabel->SetHorizontalAlignment(GUIComponent::GUI_HALIGN_CENTER);
 		mHighScoresLabel->SetVerticalAlignment(GUIComponent::GUI_VALIGN_TOP);
-		mHighScoresLabel->SetVisible(gameState == GAME_OVER || gameState == START_SCREEN);
-		mGameDisplay->GetContainer()->AddComponent(static_pointer_cast<GUIComponent>(mHighScoresLabel), GLVector2f(0.5f, 0.80f));
-		mHighScoresLabel->SetVisible(false);
+		mHighScoresLabel->SetVisible(false); // Initially hidden
+		mGameDisplay->GetContainer()->AddComponent(static_pointer_cast<GUIComponent>(mHighScoresLabel), GLVector2f(0.5f, 0.85f));
 
-		
-		for (int i = 0; i < 5; ++i) {
-			shared_ptr<GUILabel> label = make_shared<GUILabel>("");
-			label->SetHorizontalAlignment(GUIComponent::GUI_HALIGN_CENTER);
-			label->SetVerticalAlignment(GUIComponent::GUI_VALIGN_TOP);
-			label->SetVisible(gameState == GAME_OVER || gameState == START_SCREEN);
-			mHighScoreEntries.push_back(label);
-			mGameDisplay->GetContainer()->AddComponent(static_pointer_cast<GUIComponent>(label), GLVector2f(0.5f, 0.75f - i * 0.05f));
+		// Individual high score entries setup
+		mHighScoreEntries.clear(); // Clear existing entries
+		float startY = 0.80f; // Starting Y position for the first high score entry
+		for (int i = 0; i < 5; ++i) { // Display up to 5 high scores
+			shared_ptr<GUILabel> scoreLabel = make_shared<GUILabel>("");
+			scoreLabel->SetHorizontalAlignment(GUIComponent::GUI_HALIGN_CENTER);
+			scoreLabel->SetVerticalAlignment(GUIComponent::GUI_VALIGN_TOP);
+			scoreLabel->SetVisible(false); // Initially hidden
+			mGameDisplay->GetContainer()->AddComponent(static_pointer_cast<GUIComponent>(scoreLabel), GLVector2f(0.5f, startY - (i * 0.05f)));
+			mHighScoreEntries.push_back(scoreLabel);
 		}
 	}
 
@@ -712,12 +637,11 @@ void Asteroids::DrawGameOverScreen()
 			SetTimer(1000, CREATE_NEW_PLAYER);
 		}
 
-		if ((gameState == GAME_ACTIVE) && lives_left <= 0)
-		{
+		if ((gameState == GAME_ACTIVE) && lives_left <= 0) {
 			std::cout << "Game Over. Final score: " << playerScore << std::endl;  // Debug output
 			gameState = GAME_OVER;
+			SaveScoresToFile(playerName, playerScore);  // Save the score as soon as the game is over
 			mGameWorld->ClearObjects();
-			SaveHighScoresToFile();
 			DrawGameOverScreen();
 		}
 		else if (gameState == DEMO_MODE && lives_left <= 0)
@@ -737,8 +661,6 @@ void Asteroids::DrawGameOverScreen()
 			// Additional logic here
 		}
 	}
-
-
 
 
 	shared_ptr<GameObject> Asteroids::CreateExplosion()

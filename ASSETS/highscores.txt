@@ -1,1 +1,7 @@
 Player 20
+player1,30
+player2,120
+player3,60
+player4,60
+player5,20
+player6,50
